@@ -5,6 +5,7 @@
 """
 
 import os
+import re
 import sys
 from datetime import date
 
@@ -17,23 +18,23 @@ load_dotenv()
 PROJECT_ROOT = os.getenv("PROJECT_ROOT", ".")
 COMPANIES_DIR = os.getenv("COMPANIES_DIR", "companies")
 
-# 指标中文名 -> (表类型, metric_name)
-KEY_FIELDS: list[tuple[str, str, str]] = [
-    # (显示名称, 表类型, metric_name)
-    ("营业收入", "benefit", "operating_income_total"),
-    ("营业成本", "benefit", "operating_costs_total"),
-    ("营业利润", "benefit", "operating_profit"),
-    ("利润总额", "benefit", "profit_total"),
-    ("净利润", "benefit", "net_profit"),
-    ("归母净利润", "benefit", "parent_holder_net_profit"),
-    ("总资产", "debt", "assets_total"),
-    ("流动资产", "debt", "total_current_assets"),
-    ("总负债", "debt", "total_debt"),
-    ("流动负债", "debt", "current_total_debt"),
-    ("股东权益", "debt", "holder_equity_total"),
-    ("经营现金流", "cash", "act_cash_flow_net"),
-    ("投资现金流", "cash", "invest_cash_flow_net"),
-    ("筹资现金流", "cash", "financing_cash_flow_net"),
+# 指标中文名 -> metric_name
+KEY_FIELDS: list[tuple[str, str]] = [
+    # (显示名称, metric_name)
+    ("营业收入", "operating_income_total"),
+    ("营业成本", "operating_costs_total"),
+    ("营业利润", "operating_profit"),
+    ("利润总额", "profit_total"),
+    ("净利润", "net_profit"),
+    ("归母净利润", "parent_holder_net_profit"),
+    ("总资产", "assets_total"),
+    ("流动资产", "total_current_assets"),
+    ("总负债", "total_debt"),
+    ("流动负债", "current_total_debt"),
+    ("股东权益", "holder_equity_total"),
+    ("经营现金流", "act_cash_flow_net"),
+    ("投资现金流", "invest_cash_flow_net"),
+    ("筹资现金流", "financing_cash_flow_net"),
 ]
 
 
@@ -134,13 +135,12 @@ def format_financials_markdown(
     lines.append("| 指标 | 数值（元） |")
     lines.append("|------|-----------|")
 
-    for label, table_type, metric_name in KEY_FIELDS:
+    for label, metric_name in KEY_FIELDS:
         if metric_name in period_data:
             val = period_data[metric_name]
-            if val is not None:
-                lines.append(f"| {label} | {val:,.2f} |")
+            lines.append(f"| {label} | {val:,.2f} |")
 
-    return "\n".join(lines)
+    return "\n".join(lines) + "\n"
 
 
 if __name__ == "__main__":
@@ -163,9 +163,24 @@ if __name__ == "__main__":
     )
     args = parser.parse_args()
 
+    # Fix 1: 路径穿越防护 — 校验输入
+    if not re.fullmatch(r"^[A-Za-z0-9]{1,10}$", args.ticker):
+        logger.error(f"股票代码格式无效（仅允许 1-10 位字母数字）: {args.ticker}")
+        sys.exit(1)
+    if "/" in args.name or "\\" in args.name or ".." in args.name:
+        logger.error(f"企业名称包含非法字符（/, \\, ..）: {args.name}")
+        sys.exit(1)
+
     company_dir = os.path.join(
         PROJECT_ROOT, COMPANIES_DIR, f"{args.ticker}-{args.name}"
     )
+
+    # Fix 1: 路径穿越防护 — 确认目标在 COMPANIES_DIR 下
+    allowed_root = os.path.realpath(os.path.join(PROJECT_ROOT, COMPANIES_DIR))
+    if not os.path.realpath(company_dir).startswith(allowed_root):
+        logger.error(f"目标目录不在允许的范围内: {company_dir}")
+        sys.exit(1)
+
     financials_dir = os.path.join(company_dir, "financials")
 
     if not os.path.exists(company_dir):
