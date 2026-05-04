@@ -25,7 +25,7 @@ def parse_financials_file(filepath: str) -> dict[str, float]:
 
     # 匹配表格行格式: | 指标名 | 数值 |
     # 使用 [ \t] 而非 \s 防止跨行匹配（\s 会匹配 \n）
-    pattern = r"\|[ \t]*([^|]+?)[ \t]*\|[ \t]*([\d,]+\.?\d*)[ \t]*\|"
+    pattern = r"\|[ \t]*([^|]+?)[ \t]*\|[ \t]*-?([\d,]+\.?\d*)[ \t]*\|"
     for match in re.finditer(pattern, content):
         key = match.group(1).strip()
         try:
@@ -51,25 +51,25 @@ def calc_metrics(financials_data: dict[str, float]) -> dict[str, float | None]:
     equity = financials_data.get("股东权益")
 
     # 毛利率
-    if revenue and cost and revenue != 0:
+    if revenue is not None and cost is not None and revenue != 0:
         metrics["毛利率"] = round((revenue - cost) / revenue * 100, 2)
     else:
         metrics["毛利率"] = None
 
     # 净利率
-    if net_profit and revenue and revenue != 0:
+    if net_profit is not None and revenue is not None and revenue != 0:
         metrics["净利率"] = round(net_profit / revenue * 100, 2)
     else:
         metrics["净利率"] = None
 
     # ROE
-    if parent_profit and equity and equity != 0:
+    if parent_profit is not None and equity is not None and equity != 0:
         metrics["ROE"] = round(parent_profit / equity * 100, 2)
     else:
         metrics["ROE"] = None
 
     # 资产负债率
-    if total_assets and total_liabilities and total_assets != 0:
+    if total_assets is not None and total_liabilities is not None and total_assets != 0:
         metrics["资产负债率"] = round(total_liabilities / total_assets * 100, 2)
     else:
         metrics["资产负债率"] = None
@@ -84,6 +84,14 @@ if __name__ == "__main__":
     parser.add_argument("ticker", help="股票代码")
     parser.add_argument("name", help="企业名称")
     args = parser.parse_args()
+
+    # 输入校验
+    if not re.fullmatch(r"[A-Za-z0-9]{1,10}", args.ticker):
+        logger.error(f"无效的股票代码: {args.ticker}")
+        sys.exit(1)
+    if "/" in args.name or "\\" in args.name or ".." in args.name:
+        logger.error(f"无效的企业名称: {args.name}")
+        sys.exit(1)
 
     financials_dir = os.path.join(
         PROJECT_ROOT, COMPANIES_DIR, f"{args.ticker}-{args.name}", "financials"
