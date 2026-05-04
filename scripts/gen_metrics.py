@@ -25,7 +25,7 @@ def parse_financials_file(filepath: str) -> dict[str, float]:
 
     # 匹配表格行格式: | 指标名 | 数值 |
     # 使用 [ \t] 而非 \s 防止跨行匹配（\s 会匹配 \n）
-    pattern = r"\|[ \t]*([^|]+?)[ \t]*\|[ \t]*-?([\d,]+\.?\d*)[ \t]*\|"
+    pattern = r"\|[ \t]*([^|]+?)[ \t]*\|[ \t]*(-?[\d,]+\.?\d*)[ \t]*\|"
     for match in re.finditer(pattern, content):
         key = match.group(1).strip()
         try:
