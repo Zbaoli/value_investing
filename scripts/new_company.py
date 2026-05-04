@@ -1,6 +1,7 @@
 """交互式创建新企业目录和模板文件。"""
 
 import os
+import re
 import sys
 from datetime import date
 
@@ -23,22 +24,34 @@ def render_template(content: str, **kwargs) -> str:
 
 def create_company(ticker: str, name: str) -> str:
     """创建企业目录结构并生成模板文件。"""
+    # Fix 1: 路径穿越防护 — 校验输入
+    if not re.fullmatch(r"^[A-Za-z0-9]{1,10}$", ticker):
+        raise ValueError(f"股票代码格式无效（仅允许 1-10 位字母数字）: {ticker}")
+    if "/" in name or "\\" in name or ".." in name:
+        raise ValueError(f"企业名称包含非法字符（/, \\, ..）: {name}")
+
     dir_name = f"{ticker}-{name}"
     company_dir = os.path.join(PROJECT_ROOT, COMPANIES_DIR, dir_name)
     financials_dir = os.path.join(company_dir, "financials")
     templates_dir = os.path.join(PROJECT_ROOT, TEMPLATES_DIR)
 
+    # Fix 1: 路径穿越防护 — 确认目标在 COMPANIES_DIR 下
+    allowed_root = os.path.realpath(os.path.join(PROJECT_ROOT, COMPANIES_DIR))
+    if not os.path.realpath(company_dir).startswith(allowed_root):
+        raise ValueError(f"目标目录不在允许的范围内: {company_dir}")
+
     if os.path.exists(company_dir):
-        logger.error(f"企业目录已存在: {company_dir}")
-        sys.exit(1)
+        raise FileExistsError(f"企业目录已存在: {company_dir}")
 
     os.makedirs(financials_dir)
+    logger.info(f"创建财务数据目录（由 fetch_financials.py 填充）: {financials_dir}")
 
     today = date.today().isoformat()
     vars_map = {
         "COMPANY_NAME": name,
         "TICKER": ticker,
         "DATE": today,
+        "PERIOD": "YYYY-Qn",
     }
 
     # 从模板创建各文件
@@ -76,4 +89,8 @@ if __name__ == "__main__":
     if not ticker or not name:
         logger.error("代码和名称不能为空")
         sys.exit(1)
-    create_company(ticker, name)
+    try:
+        create_company(ticker, name)
+    except (FileExistsError, ValueError) as e:
+        logger.error(e)
+        sys.exit(1)
