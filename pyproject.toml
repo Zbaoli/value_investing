@@ -1,0 +1,14 @@
+[project]
+name = "value-investing"
+version = "0.1.0"
+description = "价值投资分析项目"
+requires-python = ">=3.11"
+dependencies = [
+    "akshare",
+    "pandas",
+    "python-dotenv",
+    "loguru",
+]
+
+[tool.ruff]
+line-length = 100
